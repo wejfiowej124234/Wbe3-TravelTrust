@@ -118,7 +118,7 @@ describe("TrustLayerEscrow", function () {
       const travelerBefore = await ethers.provider.getBalance(traveler.address);
       const tx = await escrow.connect(traveler).cancelBooking(0);
       const receipt = await tx.wait();
-      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const gasUsed = receipt.gasUsed * (receipt.effectiveGasPrice ?? receipt.gasPrice);
       const travelerAfter = await ethers.provider.getBalance(traveler.address);
 
       expect(travelerAfter).to.be.closeTo(travelerBefore + BOOKING_AMOUNT - gasUsed, ethers.parseEther("0.001"));

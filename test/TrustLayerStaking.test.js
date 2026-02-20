@@ -75,7 +75,7 @@ describe("TrustLayerStaking", function () {
       const balanceBefore = await ethers.provider.getBalance(guide1.address);
       const tx = await staking.connect(guide1).withdrawStake();
       const receipt = await tx.wait();
-      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const gasUsed = receipt.gasUsed * (receipt.effectiveGasPrice ?? receipt.gasPrice);
       const balanceAfter = await ethers.provider.getBalance(guide1.address);
 
       expect(balanceAfter).to.be.closeTo(balanceBefore + MINIMUM_STAKE - gasUsed, ethers.parseEther("0.001"));
