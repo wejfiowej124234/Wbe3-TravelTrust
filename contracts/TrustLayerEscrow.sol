@@ -38,6 +38,7 @@ contract TrustLayerEscrow is Ownable {
     event BookingConfirmed(uint256 indexed bookingId);
     event BookingCompleted(uint256 indexed bookingId);
     event BookingCancelled(uint256 indexed bookingId);
+    event BookingDisputed(uint256 indexed bookingId);
 
     constructor(address _staking) Ownable(msg.sender) {
         require(_staking != address(0), "Invalid staking address");
@@ -133,8 +134,10 @@ contract TrustLayerEscrow is Ownable {
             "Cannot dispute"
         );
         booking.status = BookingStatus.DISPUTED;
+        emit BookingDisputed(bookingId);
     }
 
+    /// @notice Releases escrowed funds to the guide; called by dispute contract when resolved in guide's favor.
     function releaseToGuide(uint256 bookingId) external onlyDisputeContract {
         Booking storage booking = bookings[bookingId];
         require(booking.status == BookingStatus.DISPUTED, "Not disputed");
@@ -144,6 +147,7 @@ contract TrustLayerEscrow is Ownable {
         require(success, "Transfer failed");
     }
 
+    /// @notice Refunds escrowed funds to the traveler; called by dispute contract when resolved in traveler's favor.
     function refundToTraveler(uint256 bookingId) external onlyDisputeContract {
         Booking storage booking = bookings[bookingId];
         require(booking.status == BookingStatus.DISPUTED, "Not disputed");
