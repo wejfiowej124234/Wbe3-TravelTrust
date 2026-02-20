@@ -1,0 +1,11 @@
+[build]
+target = "index.html"
+dist = "dist"
+public_url = "/"
+
+[watch]
+watch = ["src", "static"]
+
+[hooks]
+before_build = ""
+after_build = ""
