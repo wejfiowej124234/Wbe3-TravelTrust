@@ -1,0 +1,16 @@
+{
+  "name": "trustlayer",
+  "version": "1.0.0",
+  "description": "TrustLayer blockchain platform for booking verified local guides",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "hardhat": "^2.22.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}
