@@ -1,0 +1,20 @@
+# 仓库 Rust 构建与测试；确保 crates 可编译通过（见 08-5、README 实现状态）
+# 若默认分支非 main，请将下方 branches 改为实际默认分支（如 master）
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build workspace
+        run: cargo build --workspace
+      - name: Run tests
+        run: cargo test --workspace

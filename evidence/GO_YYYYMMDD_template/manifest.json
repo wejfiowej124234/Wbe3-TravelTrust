@@ -1,0 +1,8 @@
+{
+  "gate": "Gate-X",
+  "date": "YYYY-MM-DD",
+  "artifacts": [
+    { "path": "artifact-example.pdf", "sha256": "填写该文件 sha256" }
+  ],
+  "sign_off": [ "角色1", "角色2" ]
+}

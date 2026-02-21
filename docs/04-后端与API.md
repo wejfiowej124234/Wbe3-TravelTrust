@@ -50,6 +50,8 @@
 | stakes | 质押记录 | StakeTier |
 | disputes | 争议与裁决 | Dispute, DisputeResolution |
 
+**说明**：core 类型为领域最小集合；§二 表结构含更多字段（如 users 的 nickname、avatar_url、default_wallet_address、email_verified_at 等），实现时可在 core 扩展或通过 DTO 与 §二 对齐。
+
 证据原件存储与 01 §6 一致，可为**独立 evidence 表**或对象存储 + disputes/orders 关联（hash 入 disputes.evidence_hashes[]），实现时定稿。
 
 ---
@@ -83,7 +85,7 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | /health | 健康检查 |
+| GET | /health | 健康检查；响应格式（纯文本如 `ok` 或 JSON 如 `{"status":"ok"}`）由实现与监控/负载均衡约定一致 |
 | POST | /auth/register | **邮箱注册**（body: email, password；可选 nickname） |
 | POST | /auth/login | **邮箱+密码登录**（返回 JWT 或 session） |
 | POST | /auth/logout | 登出（使 token 失效或清 session） |
@@ -119,7 +121,7 @@
 | POST | /api/v1/orders/:id/cancel | **取消订单**（规则与超时见 01/03） |
 | POST | /api/v1/orders/:id/confirm-completion | 确认完成 → 放款 + 可评价 |
 | GET | /api/v1/orders/:id/reviews | 该订单评价 |
-| POST | /api/v1/orders/:id/reviews | 提交评价（仅 Completed，带权重） |
+| POST | /api/v1/orders/:id/reviews | 提交评价（仅资金终态：Completed/Refunded/PartiallyRefunded/Slashed，带权重） |
 | POST | /api/v1/orders/:id/dispute | 发起争议 |
 | GET | /api/v1/disputes | 争议列表（仲裁员） |
 | GET | /api/v1/disputes/:id | 争议详情（含证据引用） |
@@ -133,15 +135,18 @@
 
 ## 四、后端设计要点（crates/api）
 
+- **运行时参数与 08-3 SSOT**：业务参数（仲裁费、证据保留期、争议窗口、finalityN、stakeTierThresholds 等）以 [08-3-参数与门禁表](08-3-参数与门禁表.md) 为单源真相；Backend 启动须加载或校验 08-3 约定版本/关键 key，见 [08-5-CI与一致性落地说明](08-5-CI与一致性落地说明.md) §4、[Runbook §10](../ops/RUNBOOK.md)。实现落点：配置或 env 注入 SSOT 版本/参数，启动时校验或打印；无校验时须在 Runbook §10 注明「待实现」并留痕。**当前 Backend 启动 SSOT 校验已实现**，见 Runbook §10。**Backend 环境变量**（PORT、CORS_ORIGINS、SSOT_VERSION、STRICT_SSOT）见仓库根 [.env.example](../.env.example) 与 Runbook §10；**生产必须设置 CORS_ORIGINS** 限制允许的 origin，否则存在跨域风险。**请求体与超时**：请求体大小上限（建议 1MB，与证据 DoS 风控一致）、请求超时（实现时定稿，便于限流与资源保护）须在实现时配置并与运维约定。
 - **路由**：**认证与账号**（注册、登录、登出、邮箱验证、找回/重置密码）、**个人中心**（GET·PUT /api/v1/me、修改密码）、导游、订单（含接单、取消、确认完成）、争议、证据与支付/链上（见 §三）；支付回调由实现定稿，与 01 §3 链为准一致。
 - **用户与账号**：注册邮箱+密码；登录态 JWT 或 session；`/api/v1/me` 返回用户资料与按角色统计（见 §三 3.2）。总收入可对账链上放款或由订单表汇总。**身份 P0-1**：下单/接单/争议/证据提交时签名钱包与主身份校验与 01 §2 一致，实现时定稿。**代付（P0）**：后端不持私钥、不代签、不接受用户转后端；已支付仅来自链上 Paid/对账；代付若启用须法务门禁，见 [01-总库总览](01-总库总览.md) §7。
 - **风控**：与 01 §4、[03-业务流程与风控](03-业务流程与风控.md) §二 一致。**Sybil**：同设备/IP 多导游账号可限或人工复核。**评分权重**：`weight = f(订单金额, 导游历史信誉, 账户年龄)`，在 `core` 实现（03 §2.3）。**反刷/限流（P0）**：rate limit、黑名单与冻结阈值见 01 §4。**证据 DoS（P0）**：大小/类型白名单见 01 §6、02 §六。**证据上传与访问（P0）**：pre-signed URL、工单内可读、每次读审计与 01 §6 访问 P0 一致，接口在实现时与 01 §6、02 §六 定稿。**证据可用性（P0-3）**：重建工具、存储不可用/证据已删除时 SLA 与公平性口径见 01 §6，实现时定稿。**黑名单**：导游/用户 ID 表，下单/接单前校验。**allowlist**：token/合约 allowlist 校验与 01 §5 一致，后端不绕过 allowlist（见 01 禁止行为）。
-- **API 幂等**：重试/连点用 requestId 或 idempotency-key，与 01 §10 17 条 #14 一致。
-- **持久化**：trait 抽象（`UserRepository`、`OrderRepository`），支持 PostgreSQL 或分布式 DB（CockroachDB/TiDB/YugabyteDB 等），SQL 尽量标准。证据/隐私/保留与删除 P0 见 01 §6、02 §六。**对账**：对账任务/脚本与 01 §9、[02-架构设计](02-架构设计.md) §十二 一致；**事件表、checkpoint、投影**与 01 §5、02 §十二 一致（event 表 blockHash+blockNumber+logIndex，投影可重建）；主状态仅由链上事件驱动、correction 与投影分离见 01 §10 17 条 #12。**DB 全丢重建（P0-6）**：最小产物与脚本见 01 §9，与事件投影可重建一致。**可观测**：traceId 贯通 requestId→messageId→txHash→logIndex，与 01 §9 一致，便于审计导出与资损排查。#15 对账三段式、#16 状态机与副作用落点见 §二、§四、01 §9。**SLO（P0-7）**：六项指标+阈值与动作见 01 §9，后端/对账侧与 02 §十二 配合定稿。**RBAC 8 项**：选项与证据产物见 01 §7，鉴权与路由在 §三 实现时定稿。**系统级不变量**：与 01 §10 一致，后端设计不与之冲突。**12 缝后端相关**：#2 争议费用/#3 争议窗口/#10 证据时间戳/#11 钱包换绑/#12 取消矩阵与 01 §10 定稿一致，落点见 §二、§三、§四及 03；**具体数值与选项**以 [01-总库总览](01-总库总览.md) §10 12 缝表为准，实现时定稿。**资损 runbook（P0）**：至少 5 条（① RPC 大面积不可用；② Indexer 落后；③ reorg 触发撤销；④ 执行器卡单；⑤ token 冻结/黑名单导致结算失败），见 01 §9 发布与 E2E；后端/对账侧责任与 [07-开发流程与顺序](07-开发流程与顺序.md) 或运维 runbook 配合定稿。**17 条证据产物**：后端产出物（如 `correction_log`、`reconciliation_rules.json`、API `idempotency_key` 日志、执行器审计表等）与 01 §10 审计验收表一致，实现时定稿。**P1 占位**：沟通/安全/费用税务见 01 §4、法务。
+- **API 幂等**：重试/连点用 requestId 或 idempotency-key，与 01 §10 17 条 #14 一致。当前 API 已读取 Idempotency-Key/X-Idempotency-Key 并回写响应头；**实现时对写操作须校验 idempotency-key 并做 key 去重与结果复用**，落 17 条 #14 证据产物（如 idempotency 日志）。
+- **持久化**：trait 抽象（`UserRepository`、`OrderRepository`），支持 PostgreSQL 或分布式 DB（CockroachDB/TiDB/YugabyteDB 等），SQL 尽量标准。证据/隐私/保留与删除 P0 见 01 §6、02 §六。**对账**：对账任务/脚本与 01 §9、[02-架构设计](02-架构设计.md) §十二 一致；**事件表、checkpoint、投影**与 01 §5、02 §十二 一致（event 表 blockHash+blockNumber+logIndex，投影可重建）；主状态仅由链上事件驱动、correction 与投影分离见 01 §10 17 条 #12。**DB 全丢重建（P0-6）**：最小产物与脚本见 01 §9，与事件投影可重建一致。**可观测**：traceId 贯通 requestId→messageId→txHash→logIndex，与 01 §9 一致，便于审计导出与资损排查。API 响应头 x-request-id 即 requestId；对账/执行器消费消息时 **messageId 与 x-request-id 的关联方式**（透传或映射规则）由实现定稿并留痕，见 01 §9。#15 对账三段式、#16 状态机与副作用落点见 §二、§四、01 §9。**SLO（P0-7）**：六项指标+阈值与动作见 01 §9，后端/对账侧与 02 §十二 配合定稿。**RBAC 8 项**：选项与证据产物见 01 §7，鉴权与路由在 §三 实现时定稿。**系统级不变量**：与 01 §10 一致，后端设计不与之冲突。**12 缝后端相关**：#2 争议费用/#3 争议窗口/#10 证据时间戳/#11 钱包换绑/#12 取消矩阵与 01 §10 定稿一致，落点见 §二、§三、§四及 03；**具体数值与选项**以 [01-总库总览](01-总库总览.md) §10 12 缝表为准，实现时定稿。**资损 runbook（P0）**：至少 5 条（① RPC 大面积不可用；② Indexer 落后；③ reorg 触发撤销；④ 执行器卡单；⑤ token 冻结/黑名单导致结算失败），见 01 §9 发布与 E2E；后端/对账侧责任与 [07-开发流程与顺序](07-开发流程与顺序.md) 或运维 runbook 配合定稿。**17 条证据产物**：后端产出物（如 `correction_log`、`reconciliation_rules.json`、API `idempotency_key` 日志、执行器审计表等）与 01 §10 审计验收表一致，实现时定稿。**P1 占位**：沟通/安全/费用税务见 01 §4、法务。
 
 ---
 
 ## 五、落地顺序建议
+
+**Phase 0（架构锁定）、Phase 5（风控与运营就绪）** 定义及产出见 [07-开发流程与顺序](07-开发流程与顺序.md) §二；本文以下为 Phase 1～4。
 
 1. **Phase 1**：Rust workspace + `core` 类型 + `api` 骨架 + 基础 CRUD（用户、导游、订单状态机）。
 2. **Phase 2**：Escrow 流程（下单锁定、完成放款）、评价与权重、Staking 表与接口。

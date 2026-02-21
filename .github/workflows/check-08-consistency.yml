@@ -1,0 +1,20 @@
+# 08-3 与 08-4 一致性校验（W-PDP-SSOT-CONSISTENCY）
+# 当 PR 改动 docs/08-3-参数与门禁表.md 且触及映射 key 时，须同步修改 docs/08-4-对外口径包.md 的「文档版本（CI 校验用）」行，否则本 workflow 失败。
+# 设计假设：同仓 PR；若为 fork PR 且 base.sha 不可用导致失败，可重跑或由维护者确认后合并。
+name: Check 08-3 / 08-4 consistency
+
+on:
+  pull_request:
+    paths:
+      - 'docs/08-3*.md'
+      - 'docs/08-4*.md'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check 08-3 and 08-4 consistency
+        run: ./scripts/check-08-consistency.sh ${{ github.event.pull_request.base.sha }}

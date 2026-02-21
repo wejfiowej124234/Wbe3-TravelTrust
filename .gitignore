@@ -1,6 +1,21 @@
+# 构建与依赖
 /target
-**/*.rs.bk
-Cargo.lock
+**/target
 dist
+Cargo.lock
+
+# 环境与密钥（勿提交）
 .env
+.env.*
+!.env.example
 *.pem
+*.key
+*credentials*
+
+# 备份与本地
+**/*.rs.bk
+*.bak
+*.tmp
+
+# 真实 evidence bundle（过门时产出，可能含内部信息；模板与 README 可提交）
+evidence/GO_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/

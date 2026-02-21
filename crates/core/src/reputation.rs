@@ -20,7 +20,7 @@ impl ReviewWeight {
     }
 }
 
-/// 仅当订单为 Completed 时允许评价
+/// 仅当订单为资金终态（completed/refunded/partially_refunded/slashed）时允许评价（01 §4、04 §2.2）
 pub fn can_submit_review(state: OrderState) -> bool {
-    state == OrderState::Completed
+    state.is_final_financial_state()
 }

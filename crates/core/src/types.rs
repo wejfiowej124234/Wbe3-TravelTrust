@@ -12,6 +12,7 @@ pub enum UserRole {
     Arbitrator,
 }
 
+/// 用户领域类型（最小集合）。04 §二 users 表含更多字段（nickname, avatar_url, default_wallet_address, email_verified_at 等），实现时扩展本结构或使用 DTO 与 API 对齐。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
